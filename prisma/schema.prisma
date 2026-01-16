@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  plan         Plan     @default(FREE)
+  users        UserTenant[]
+  influencers  Influencer[]
+  rateLimits   RateLimit[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenants   UserTenant[]
+}
+
+model UserTenant {
+  userId   String
+  tenantId String
+  role     UserRole @default(MEMBER)
+  user     User     @relation(fields: [userId], references: [id])
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  @@id([userId, tenantId])
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum Plan {
+  FREE
+  PRO
+  AGENCY
+}
+
+model Influencer {
+  id            String   @id @default(cuid())
+  tenantId      String
+  name          String
+  handle        String
+  coreProfileId String   @unique
+  visualProfile VisualProfile?
+  coreProfile   CoreProfile @relation(fields: [coreProfileId], references: [id])
+  memories      Memory[]
+  contents      GeneratedContent[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model CoreProfile {
+  id          String   @id @default(cuid())
+  name        String
+  personality String   // JSON or rich text
+  archetypes  String   // CSV or JSON
+  values      String
+  tone        String
+  limits      String   // Ethical and aesthetic limits
+}
+
+model VisualProfile {
+  id           String   @id @default(cuid())
+  influencerId String   @unique
+  faceIdentity String   // internal face token/descriptor
+  styleNotes   String   // constraints for photorealistic consistency
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  influencer   Influencer @relation(fields: [influencerId], references: [id])
+}
+
+enum MemoryType {
+  STRUCTURAL
+  NARRATIVE
+  EMOTIONAL
+}
+
+model Memory {
+  id            String     @id @default(cuid())
+  influencerId  String
+  type          MemoryType
+  content       String     // JSON blob
+  tags          String?
+  createdAt     DateTime   @default(now())
+  influencer    Influencer @relation(fields: [influencerId], references: [id])
+  @@index([influencerId, type, createdAt])
+}
+
+model GeneratedContent {
+  id            String   @id @default(cuid())
+  influencerId  String
+  date          DateTime
+  kind          ContentKind
+  data          String   // JSON: captions, stories, reels script, carousel etc.
+  performance   String?  // JSON: simulated performance feedback
+  createdAt     DateTime @default(now())
+  influencer    Influencer @relation(fields: [influencerId], references: [id])
+  @@index([influencerId, date])
+}
+
+enum ContentKind {
+  STORY_SEQUENCE
+  FEED_POST
+  REEL
+  CAROUSEL
+  BREATHING_PHOTO
+}
+
+model RateLimit {
+  id         String   @id @default(cuid())
+  tenantId   String
+  key        String
+  points     Int
+  duration   Int
+  createdAt  DateTime @default(now())
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  @@unique([tenantId, key])
+}
